@@ -12,17 +12,21 @@ const COUNTER_DEFAULT = 127; // fallback / first-time init value
 
 /* ─── FIREBASE CONFIG ─── */
 const firebaseConfig = {
-  apiKey:            "AIzaSyClGsJc_USk3-laja5jbpo6FAfJ4qb1E-s",
-  authDomain:        "blackroom-d7ca8.firebaseapp.com",
-  projectId:         "blackroom-d7ca8",
-  storageBucket:     "blackroom-d7ca8.firebasestorage.app",
-  messagingSenderId: "42019716983",
-  appId:             "1:42019716983:web:cd2b1c948e1c3f85f3eb72"
+  apiKey:            "AIzaSyDxoGHnw2P4KYXiIbcG1c_WPkq4s41IcG0",
+  authDomain:        "blackbox-55faa.firebaseapp.com",
+  projectId:         "blackbox-55faa",
+  storageBucket:     "blackbox-55faa.firebasestorage.app",
+  messagingSenderId: "340795394064",
+  appId:             "1:340795394064:web:91c4f8ad0b5b5ce6d5a295"
 };
 
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const db          = firebase.firestore();
-const counterRef  = db.collection('counter').doc('main');
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+  console.log('[BlackBox] Firebase initialized ✅');
+}
+const db         = firebase.firestore();
+const counterRef = db.collection('counter').doc('main');
+console.log('[BlackBox] Firestore connected ✅');
 
 /* ─── LOADER ─── */
 const loader   = document.getElementById('loader');
@@ -156,16 +160,21 @@ function animateCountTo(target, duration = 800) {
 // Load counter from Firestore on page load
 counterRef.get().then((doc) => {
   if (doc.exists) {
-    animateCountTo(doc.data().count, 1200);
+    const val = doc.data().count;
+    console.log('[BlackBox] Counter loaded: ' + val + ' ✅');
+    animateCountTo(val, 1200);
   } else {
-    // First time — initialize the document
+    // First time setup — create document with default
+    console.log('[BlackBox] No counter doc found — initializing with ' + COUNTER_DEFAULT);
     counterRef.set({ count: COUNTER_DEFAULT }).then(() => {
       animateCountTo(COUNTER_DEFAULT, 1200);
+    }).catch((err) => {
+      console.error('[BlackBox] Failed to initialize counter:', err);
     });
   }
-}).catch(() => {
-  // Firebase unreachable — show default silently
-  animateCountTo(COUNTER_DEFAULT, 1200);
+}).catch((err) => {
+  // Firestore unreachable — keep whatever is currently displayed, never reset
+  console.error('[BlackBox] Firestore load error:', err);
 });
 
 // Increment Firestore counter atomically, then update UI
@@ -175,9 +184,14 @@ function incrementCounter() {
   }).then(() => {
     return counterRef.get();
   }).then((doc) => {
-    if (doc.exists) animateCountTo(doc.data().count, 500);
-  }).catch(() => {
-    // Silently fail — UI stays at last known value
+    if (doc.exists) {
+      const val = doc.data().count;
+      console.log('[BlackBox] Counter updated: ' + val + ' ✅');
+      animateCountTo(val, 500);
+    }
+  }).catch((err) => {
+    // Silently fail — UI stays at last known value, never resets to 0
+    console.error('[BlackBox] Counter increment error:', err);
   });
 }
 
