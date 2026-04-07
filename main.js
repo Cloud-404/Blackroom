@@ -7,9 +7,22 @@
  */
 
 /* ─── CONSTANTS ─── */
-const COUNTER_KEY     = 'blackbox_counter';
-const JOINED_KEY      = 'blackbox_joined';
-const COUNTER_BASE    = 127; // starting offset — looks real
+const JOINED_KEY   = 'blackbox_joined';
+const COUNTER_DEFAULT = 127; // fallback / first-time init value
+
+/* ─── FIREBASE CONFIG ─── */
+const firebaseConfig = {
+  apiKey:            "AIzaSyClGsJc_USk3-laja5jbpo6FAfJ4qb1E-s",
+  authDomain:        "blackroom-d7ca8.firebaseapp.com",
+  projectId:         "blackroom-d7ca8",
+  storageBucket:     "blackroom-d7ca8.firebasestorage.app",
+  messagingSenderId: "42019716983",
+  appId:             "1:42019716983:web:cd2b1c948e1c3f85f3eb72"
+};
+
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db          = firebase.firestore();
+const counterRef  = db.collection('counter').doc('main');
 
 /* ─── LOADER ─── */
 const loader   = document.getElementById('loader');
@@ -120,17 +133,10 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   });
 });
 
-/* ─── LIVE COUNTER ─── */
+/* ─── LIVE COUNTER (Firestore) ─── */
 const counterEl = document.getElementById('counter-value');
 
-function getCount() {
-  return parseInt(localStorage.getItem(COUNTER_KEY) || COUNTER_BASE, 10);
-}
-
-function setCount(n) {
-  localStorage.setItem(COUNTER_KEY, n);
-}
-
+// Smoothly animate the counter display (UI only — no storage)
 function animateCountTo(target, duration = 800) {
   const start     = parseInt(counterEl.textContent.replace(/,/g, ''), 10) || 0;
   const startTime = performance.now();
@@ -147,13 +153,32 @@ function animateCountTo(target, duration = 800) {
   requestAnimationFrame(step);
 }
 
-// Display persisted count on load
-animateCountTo(getCount(), 1200);
+// Load counter from Firestore on page load
+counterRef.get().then((doc) => {
+  if (doc.exists) {
+    animateCountTo(doc.data().count, 1200);
+  } else {
+    // First time — initialize the document
+    counterRef.set({ count: COUNTER_DEFAULT }).then(() => {
+      animateCountTo(COUNTER_DEFAULT, 1200);
+    });
+  }
+}).catch(() => {
+  // Firebase unreachable — show default silently
+  animateCountTo(COUNTER_DEFAULT, 1200);
+});
 
+// Increment Firestore counter atomically, then update UI
 function incrementCounter() {
-  const newCount = getCount() + 1;
-  setCount(newCount);
-  animateCountTo(newCount, 500);
+  counterRef.update({
+    count: firebase.firestore.FieldValue.increment(1)
+  }).then(() => {
+    return counterRef.get();
+  }).then((doc) => {
+    if (doc.exists) animateCountTo(doc.data().count, 500);
+  }).catch(() => {
+    // Silently fail — UI stays at last known value
+  });
 }
 
 /* ─── WAITLIST LOGIC ─── */
